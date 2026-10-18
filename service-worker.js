@@ -1,4 +1,4 @@
-const CACHE = "molequest-demo-v1";
+const CACHE = "molequest-demo-v2";
 const FILES = ["./", "./index.html", "./elements.js", "./molecules.js", "./manifest.webmanifest", "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES)).then(() => self.skipWaiting()));
