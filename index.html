@@ -15,10 +15,14 @@ body{display:flex;flex-direction:column;background:var(--bg);color:var(--text);f
 h1{font-size:22px;margin:0;color:var(--acc)}
 #rd{font-size:12px;color:var(--mute);margin-left:auto}
 .app{flex:1;min-height:0;display:grid;grid-template-columns:1.5fr 1fr;gap:14px;padding:0 16px 14px}
-@media(max-width:800px){body{height:auto}.app{grid-template-columns:1fr}.stage{min-height:340px}}
 .stage,.side{background:var(--panel);border:1px solid var(--line);border-radius:14px}
 .stage{position:relative;overflow:hidden;min-height:0}
 #cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+@media(max-width:800px){
+  body{height:auto}
+  .app{flex:none;min-height:0;grid-template-columns:1fr;grid-template-rows:minmax(340px,auto) auto}
+  .app>.stage{min-height:340px}
+}
 #banner{position:absolute;left:0;right:0;top:12px;text-align:center;font-size:20px;font-weight:700;color:var(--warn);padding:0 10px}
 .side{padding:14px;overflow:auto}
 #turn{font-size:26px;font-weight:800}
