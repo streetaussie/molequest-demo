@@ -1,0 +1,489 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1520">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MoleQuest">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<title>Mole-Quest Demo</title>
+<style>
+:root{--bg:#0d1520;--panel:#16212f;--text:#e8eef6;--mute:#93a4b7;--line:#27384c;--acc:#4fd1a5;--bond:#9fb0c3;--warn:#ffb454}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;background:var(--bg);color:var(--text);font-family:system-ui,"Segoe UI",sans-serif}
+#top{display:flex;gap:14px;align-items:center;padding:10px 16px;flex-wrap:wrap}
+h1{font-size:22px;margin:0;color:var(--acc)}
+#rd{font-size:12px;color:var(--mute);margin-left:auto}
+.app{flex:1;min-height:0;display:grid;grid-template-columns:1.5fr 1fr;gap:14px;padding:0 16px 14px}
+@media(max-width:800px){body{height:auto}.app{grid-template-columns:1fr}.stage{min-height:340px}}
+.stage,.side{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.stage{position:relative;overflow:hidden;min-height:0}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+#banner{position:absolute;left:0;right:0;top:12px;text-align:center;font-size:20px;font-weight:700;color:var(--warn);padding:0 10px}
+.side{padding:14px;overflow:auto}
+#turn{font-size:26px;font-weight:800}
+#msg{color:var(--warn);margin:4px 0 10px;min-height:22px}
+h2{margin:8px 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+#mname{font-size:26px;font-weight:800}#mform{color:var(--acc);margin-bottom:6px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--line);font-size:14px}
+.row span{color:var(--mute)}.row b{text-align:right}
+#fact{font-size:13px;color:var(--mute);margin-top:6px}
+.hint{font-size:12px;color:var(--mute);margin:4px 0 6px}
+.scoreboard{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin:0 16px 12px;padding:6px 12px;overflow:auto;max-height:190px}
+.scoreboard table{border-collapse:collapse;width:100%;font-size:14px}
+.scoreboard th,.scoreboard td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+.scoreboard th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.scoreboard tr:last-child td{border-bottom:0}
+.scoreboard td:last-child,.scoreboard th:last-child{text-align:right}
+.scoreboard tr.on td{color:var(--acc);font-weight:700}
+.btn{padding:9px 13px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);cursor:pointer;font-size:14px;font-family:inherit;margin:4px 6px 0 0}
+.btn.go{background:var(--acc);color:#04130d;border-color:var(--acc);font-weight:700}
+.btn:disabled{opacity:.4;cursor:default}
+#soundToggle{margin:0 0 0 10px;white-space:nowrap}
+#hist{font-size:13px;color:var(--mute);margin-top:8px}
+#demo{display:none;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);font-size:12px;color:var(--mute)}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:9}
+#modal>div{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;max-width:420px;width:92%;text-align:center}
+#modal input,#modal select{padding:7px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);margin:4px;font-size:15px}
+#molchoice{padding:5px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit}
+#modal h2{font-size:26px;color:var(--acc);text-transform:none;letter-spacing:0}
+</style></head><body>
+<div id="top"><h1>Mole-Quest</h1><div id="rd"></div><button id="soundToggle" class="btn" type="button" aria-pressed="true">♫ Sound on</button></div>
+<div class="app">
+<div class="stage"><canvas id="cv"></canvas><div id="banner"></div></div>
+<div class="side">
+<div id="turn"></div><div id="msg"></div>
+<div id="info"></div>
+<div id="btns"></div>
+<div id="hist"></div>
+<div id="demo"></div>
+</div></div>
+<div class="scoreboard"><table><thead><tr><th>Player</th><th>Score</th></tr></thead><tbody id="pl"></tbody></table></div>
+<div id="modal"><div id="mbox"></div></div>
+<script src="./elements.js"></script>
+<script>
+// ---------- elements: read from program/elements.json ----------
+const EL={};
+Object.keys(ELEMENTS_DATA.elements).forEach(s=>{const e=ELEMENTS_DATA.elements[s];
+  EL[s]={n:e.name,c:e.color,t:e.textColor,r:e.radius,m:e.mass,z:e.number,ve:e.valenceElectrons,cfg:e.config,lp0:e.lonePairs,un0:e.unpaired,val:e.usuallyBonds,ang:e.angles||{}}});
+const BL=ELEMENTS_DATA.bondLengths||{};
+const bl=(a,b,o)=>BL[[a,b].sort().join("-")+"-"+o]||1.4;
+function angleFor(el,nb,nbEls){
+  const a=EL[el].ang;
+  if(a[nb]!==undefined)return a[nb];
+  if(a.allH!==undefined&&nbEls.every(x=>x==="H"))return a.allH;
+  return a.default!==undefined?a.default:109.5;
+}
+const VE={};Object.keys(EL).forEach(s=>VE[s]=EL[s].ve);
+document.getElementById("demo").innerHTML='<span>Demo cards:</span>'+Object.keys(EL).map(s=>'<button class="btn" data-a="'+s+'">'+s+'</button>').join("")+
+  '<button class="btn" data-a="undo">Undo</button><button class="btn" data-a="clear">Clear</button>';
+// ---------- molecules: read from program/molecules.js ----------
+const MR=[];
+const M=(name,formula,atoms,bonds,o)=>MR.push(Object.assign({name,formula,atoms,bonds,bp:"—",fp:"—"},o));
+</script>
+<script src="./molecules.js"></script>
+<script>
+const MOL=MR.map(r=>{
+  const atoms=Array.isArray(r.atoms)?r.atoms:r.atoms.match(/[A-Z][a-z]?/g),n=atoms.length,cnt={};atoms.forEach(e=>cnt[e]=(cnt[e]||0)+1);
+  const key=Object.keys(cnt).sort().map(e=>e+cnt[e]).join("");
+  const sum=Array(n).fill(0);r.bonds.forEach(([i,j,o])=>{sum[i]+=o;sum[j]+=o});
+  const fc=r.fc||{},lp=atoms.map((e,i)=>(VE[e]-(fc[i]||0)-sum[i])/2),by={};
+  atoms.forEach((e,i)=>{if(lp[i]>0)by[e]=(by[e]||0)+lp[i]});
+  const lpTotal=lp.reduce((s,x)=>s+x,0),pi=r.bonds.reduce((s,b)=>s+b[2]-1,0);
+  return Object.assign({},r,{atoms,key,fc,lp,lpTotal,pi,ch:r.ch||0,pts:n+pi,mass:atoms.reduce((s,e)=>s+EL[e].m,0),
+    lpText:lpTotal?Object.keys(by).map(e=>by[e]+" on "+e).join(", "):"None"});
+});
+const keyOf=list=>{const c={};list.forEach(e=>c[e]=(c[e]||0)+1);return Object.keys(c).sort().map(e=>e+c[e]).join("")};
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const nrm=a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/l,a[1]/l,a[2]/l]};
+const crs=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const vsub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],vadd=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],vmul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
+const vlen=a=>Math.hypot(a[0],a[1],a[2]);
+const perp=a=>nrm(crs(a,Math.abs(a[1])<.9?[0,1,0]:[1,0,0]));
+function geo(m){
+  if(m.g)return m.g;
+  const n=m.atoms.length,nb=Array.from({length:n},()=>[]),C=[],bd={},known={};
+  m.bonds.forEach(([i,j,o])=>{nb[i].push(j);nb[j].push(i);const d=bl(m.atoms[i],m.atoms[j],o);C.push([i,j,d,0]);bd[i+","+j]=bd[j+","+i]=d;known[i+","+j]=known[j+","+i]=1});
+  for(let c=0;c<n;c++){const L=nb[c];for(let a=0;a<L.length;a++)for(let b=a+1;b<L.length;b++){
+    const i=L[a],j=L[b],ov=m.ov&&m.ov[c],pair=[i,j].sort((x,y)=>x-y).join("-"),t=typeof ov==="number"?ov:(ov&&ov[pair]!==undefined?ov[pair]:angleFor(m.atoms[c],L.length,L.map(x=>m.atoms[x]))),l1=bd[c+","+i],l2=bd[c+","+j];
+    C.push([i,j,Math.sqrt(l1*l1+l2*l2-2*l1*l2*Math.cos(t*Math.PI/180)),0]);known[i+","+j]=known[j+","+i]=1}}
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)if(!known[i+","+j])C.push([i,j,2.1,1]);
+  let best=null,bestE=1e9;
+  for(let seed=1;seed<=14;seed++){
+    let s=seed*9301+49297;const rnd=()=>{s=(s*9301+49297)%233280;return s/233280-.5};
+    const P=Array.from({length:n},()=>[rnd()*3,rnd()*3,m.flat?0:rnd()*3]);
+    for(let it=0;it<4000;it++)C.forEach(([i,j,d,t])=>{
+      const a=P[i],b=P[j],dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2],L=Math.hypot(dx,dy,dz)||1e-3;
+      if(t===1&&L>=d)return;const f=(L-d)/L*.4;
+      a[0]+=f*dx;a[1]+=f*dy;a[2]+=f*dz;b[0]-=f*dx;b[1]-=f*dy;b[2]-=f*dz});
+    let E=0;C.forEach(([i,j,d,t])=>{if(t===0){const L=Math.hypot(P[i][0]-P[j][0],P[i][1]-P[j][1],P[i][2]-P[j][2]);E+=(L-d)*(L-d)}});
+    if(E<bestE){bestE=E;best=P}}
+  const c=[0,1,2].map(k=>best.reduce((s,p)=>s+p[k],0)/n);best.forEach(p=>{p[0]-=c[0];p[1]-=c[1];p[2]-=c[2]});
+  let bi=0,bj=1,bm=-1;
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const d=Math.hypot(best[i][0]-best[j][0],best[i][1]-best[j][1],best[i][2]-best[j][2]);if(d>bm){bm=d;bi=i;bj=j}}
+  const e1=nrm([best[bj][0]-best[bi][0],best[bj][1]-best[bi][1],best[bj][2]-best[bi][2]]);
+  let far=[0,0,0],fd=0;
+  best.forEach(p=>{const t=dot(p,e1),q=[p[0]-e1[0]*t,p[1]-e1[1]*t,p[2]-e1[2]*t],l=Math.hypot(q[0],q[1],q[2]);if(l>fd){fd=l;far=q}});
+  const e2=fd<1e-3?nrm(crs(e1,Math.abs(e1[1])<.9?[0,1,0]:[1,0,0])):nrm(far),e3=crs(e1,e2);
+  m.g=best.map(p=>[dot(p,e1),dot(p,e2),dot(p,e3)]);m.err=bestE;
+  m.R=Math.max(...m.g.map(p=>Math.hypot(p[0],p[1],p[2])));
+  return m.g;
+}
+// Directions of the lone pairs, built from the real 3D positions (VSEPR-style)
+function lpDirs(m){
+  if(m.lpd)return m.lpd;
+  const g=geo(m),n=m.atoms.length,nb=Array.from({length:n},()=>[]),out=[];
+  m.bonds.forEach(([i,j])=>{nb[i].push(j);nb[j].push(i)});
+  for(let i=0;i<n;i++){
+    const k=m.lp[i];if(!k)continue;
+    const U=nb[i].map(j=>nrm(vsub(g[j],g[i])));let D=[];
+    if(U.length===1){
+      const a=vmul(U[0],-1);
+      if(k===1)D=[a];
+      else{
+        const j=nb[i][0],o=nb[j].find(x=>x!==i);let e1=null;
+        if(o!==undefined){const r=vsub(g[o],g[j]),pr=vsub(r,vmul(a,dot(r,a)));if(vlen(pr)>.2)e1=nrm(pr)}
+        if(!e1)e1=perp(a);
+        const e2=crs(a,e1),f=(phi,psi)=>vadd(vmul(a,Math.cos(phi)),vmul(vadd(vmul(e1,Math.cos(psi)),vmul(e2,Math.sin(psi))),Math.sin(phi)));
+        D=k===2?[f(Math.PI/3,0),f(Math.PI/3,Math.PI)]:[0,1,2].map(q=>f(1.2305,q*2*Math.PI/3));
+      }
+    }else if(U.length===2){
+      const s=vadd(U[0],U[1]),b=vlen(s)>.2?nrm(vmul(s,-1)):perp(U[0]);
+      if(k===1)D=[b];
+      else{const nn=vlen(crs(U[0],U[1]))>.2?nrm(crs(U[0],U[1])):perp(U[0]),th=.9553;
+        D=[vadd(vmul(b,Math.cos(th)),vmul(nn,Math.sin(th))),vadd(vmul(b,Math.cos(th)),vmul(nn,-Math.sin(th)))]}
+    }else if(U.length===3){
+      if(k===2&&m.shape==="T-shaped"){
+        let pair=[0,1],bestDot=1;
+        for(let a=0;a<3;a++)for(let b=a+1;b<3;b++){const q=dot(U[a],U[b]);if(q<bestDot){bestDot=q;pair=[a,b]}}
+        const eq=U[[0,1,2].find(q=>q!==pair[0]&&q!==pair[1])],axis=U[pair[0]],side=nrm(crs(axis,eq));
+        D=[vadd(vmul(eq,-.5),vmul(side,Math.sqrt(3)/2)),vadd(vmul(eq,-.5),vmul(side,-Math.sqrt(3)/2))];
+      }else{
+        const s=vmul(vadd(vadd(U[0],U[1]),U[2]),-1);
+        D=[vlen(s)>.25?nrm(s):nrm(crs(vsub(U[1],U[0]),vsub(U[2],U[0])))];
+      }
+    }else if(U.length===4&&k===1){
+      let pair=[0,1],bestDot=1;
+      for(let a=0;a<4;a++)for(let b=a+1;b<4;b++){const q=dot(U[a],U[b]);if(q<bestDot){bestDot=q;pair=[a,b]}}
+      const rest=U.filter((_,q)=>q!==pair[0]&&q!==pair[1]),s=vmul(vadd(rest[0],rest[1]),-1);
+      if(vlen(s)>.25)D=[nrm(s)];
+    }else if(U.length===5&&k===1){
+      const s=vmul(U.reduce((a,b)=>vadd(a,b),[0,0,0]),-1);
+      if(vlen(s)>.25)D=[nrm(s)];
+    }
+    D.forEach(d=>out.push({i,d:nrm(d)}));
+  }
+  return m.lpd=out;
+}
+const lpDist=el=>EL[el].r*.75+.28;
+// A single free atom: lone pairs and unpaired electrons on tetrahedral positions
+const TET=[[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]].map(nrm);
+function freeAtom(el){
+  const e=EL[el],out=[];
+  for(let q=0;q<e.lp0;q++)out.push({d:TET[q],k:"lp"});
+  for(let q=0;q<e.un0;q++)out.push({d:TET[e.lp0+q],k:"e"});
+  return out;
+}
+// GEO-END
+const $=id=>document.getElementById(id);
+let soundEnabled=true;
+try{soundEnabled=localStorage.getItem("molequest-sound")!=="off"}catch(e){}
+let audioCtx=null,audioMaster=null,effectsBus=null,musicBus=null,lofiTimer=null,nextLofiTime=0,lofiStepIndex=0,lofiNoiseBuffer=null;
+function audioReady(){
+  if(!soundEnabled)return false;
+  if(!audioCtx){
+    const AudioCtor=window.AudioContext||window.webkitAudioContext;if(!AudioCtor)return false;
+    audioCtx=new AudioCtor();audioMaster=audioCtx.createGain();effectsBus=audioCtx.createGain();musicBus=audioCtx.createGain();
+    effectsBus.gain.value=5.544;musicBus.gain.value=1.078;audioMaster.gain.value=.78;
+    effectsBus.connect(audioMaster);musicBus.connect(audioMaster);audioMaster.connect(audioCtx.destination);
+  }
+  if(audioCtx.state==="suspended")audioCtx.resume().catch(()=>{});
+  return true;
+}
+function tone(freq,delay,duration,level,wave,glide,pan,bus){
+  if(!audioReady())return;
+  const t=audioCtx.currentTime+Math.max(0,delay||0),osc=audioCtx.createOscillator(),gain=audioCtx.createGain(),peak=Math.max(.0001,level||.03);
+  osc.type=wave||"sine";osc.frequency.setValueAtTime(Math.max(1,freq),t);if(glide)osc.frequency.exponentialRampToValueAtTime(Math.max(1,glide),t+duration);
+  gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(peak,t+Math.min(.018,duration*.22));gain.gain.exponentialRampToValueAtTime(.0001,t+duration);
+  const out=bus||effectsBus;
+  if(pan&&audioCtx.createStereoPanner){const p=audioCtx.createStereoPanner();p.pan.value=pan;osc.connect(gain);gain.connect(p);p.connect(out)}else{osc.connect(gain);gain.connect(out)}
+  osc.start(t);osc.stop(t+duration+.025);
+}
+function bell(freq,delay,level){tone(freq,delay,.58,level||.035,"sine",null,0);tone(freq*2.72,delay,.30,(level||.035)*.17,"sine",null,0)}
+function playScan(count){for(let i=0;i<Math.min(2,count);i++){tone(920,.11*i,.075,.025,"sine",710,i ? .18 : -.18);tone(1210,.11*i+.035,.12,.014,"sine",null,i ? .18 : -.18)}}
+function playElementPop(el,index){const f={H:523.25,C:493.88,N:587.33,O:659.25,P:392,S:440,Cl:698.46,F:783.99}[el]||554.37;bell(f,.08*(index||0),.031)}
+function playBondBuild(count){for(let i=0;i<Math.min(4,count);i++)tone(294+42*i,.13*i,.20,.026,"triangle",390+48*i,(i%2?-.12:.12))}
+function playMoleculeReveal(charge){const ns=charge?[587.33,698.46,880]:[523.25,659.25,783.99];ns.forEach((f,i)=>bell(f,.12*i,.027))}
+function playClaim(){[392,493.88,587.33].forEach((f,i)=>tone(f,.10*i,.42,.030,"sine",null,(i-1)*.12))}
+function playSkip(){tone(330,0,.075,.025,"triangle",280,-.18);tone(350,.16,.075,.025,"triangle",300,.18);tone(440,.34,.30,.030,"sine",null,0)}
+function playTurnPass(){tone(392,0,.23,.022,"sine",null,-.12);tone(329.63,.16,.32,.026,"sine",null,.12)}
+function playClear(){bell(659.25,0,.018);tone(523.25,.13,.38,.018,"sine",440,0)}
+function playSoftNo(){tone(246.94,0,.24,.020,"triangle",207.65,0)}
+function playStart(){[261.63,392,523.25].forEach((f,i)=>tone(f,.10*i,.34,.026,"sine",null,(i-1)*.12))}
+function playVictory(){[523.25,659.25,783.99,1046.5].forEach((f,i)=>bell(f,.14*i,.034))}
+function playTap(){tone(740,0,.045,.014,"sine",680,0)}
+function playLonePair(){bell(880,0,.018);bell(1174.66,.12,.016)}
+const lofiProgression=[
+  {root:65.41,notes:[130.81,164.81,196,246.94,293.66]},
+  {root:55,notes:[110,130.81,164.81,196,246.94]},
+  {root:73.42,notes:[146.83,174.61,220,261.63,329.63]},
+  {root:49,notes:[98,146.83,196,220,246.94]}
+];
+function lofiRhodes(freq,at,level){
+  const o=audioCtx.createOscillator(),o2=audioCtx.createOscillator(),partial=audioCtx.createGain(),filter=audioCtx.createBiquadFilter(),env=audioCtx.createGain();
+  o.type="sine";o.frequency.setValueAtTime(freq,at);o2.type="sine";o2.frequency.setValueAtTime(freq*2.01,at);partial.gain.value=.13;filter.type="lowpass";filter.frequency.value=1550;filter.Q.value=.55;
+  env.gain.setValueAtTime(.0001,at);env.gain.exponentialRampToValueAtTime(level,at+.018);env.gain.exponentialRampToValueAtTime(level*.30,at+.72);env.gain.exponentialRampToValueAtTime(.0001,at+2.35);
+  o.connect(filter);o2.connect(partial);partial.connect(filter);filter.connect(env);env.connect(musicBus);o.start(at);o2.start(at);o.stop(at+2.4);o2.stop(at+2.4);
+}
+function lofiKick(at,level){
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type="sine";o.frequency.setValueAtTime(105,at);o.frequency.exponentialRampToValueAtTime(48,at+.16);
+  g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(level,at+.008);g.gain.exponentialRampToValueAtTime(.0001,at+.24);o.connect(g);g.connect(musicBus);o.start(at);o.stop(at+.26);
+}
+function lofiNoise(at,duration,level,filterType,cutoff){
+  if(!lofiNoiseBuffer){const n=Math.max(1,Math.floor(audioCtx.sampleRate));lofiNoiseBuffer=audioCtx.createBuffer(1,n,audioCtx.sampleRate);const data=lofiNoiseBuffer.getChannelData(0);for(let i=0;i<n;i++)data[i]=Math.random()*2-1}
+  const src=audioCtx.createBufferSource(),filter=audioCtx.createBiquadFilter(),g=audioCtx.createGain();src.buffer=lofiNoiseBuffer;filter.type=filterType;filter.frequency.value=cutoff;filter.Q.value=filterType==="bandpass" ? .7 : .6;
+  g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(level,at+.005);g.gain.exponentialRampToValueAtTime(.0001,at+duration);src.connect(filter);filter.connect(g);g.connect(musicBus);
+  const offset=Math.random()*Math.max(.001,1-duration);src.start(at,offset,duration);src.stop(at+duration+.01);
+}
+function lofiSnare(at){lofiNoise(at,.15,.018,"bandpass",1850);tone(185,0,.16,.016,"sine",125,0,musicBus)}
+function scheduleLofiStep(step,at){
+  const beat=Math.floor(step/2),offbeat=step%2===1,barBeat=beat%4,chord=lofiProgression[Math.floor(beat/8)%lofiProgression.length];
+  if(beat%8===0)chord.notes.forEach((f,i)=>lofiRhodes(f,at+i*.018,i===0 ? .045 : .030));
+  if(!offbeat&&barBeat===0){lofiKick(at,.060);tone(chord.root,0,.48,.036,"sine",chord.root*.98,0,musicBus)}
+  if(!offbeat&&barBeat===2)lofiKick(at,.036);
+  if(!offbeat&&(barBeat===1||barBeat===3))lofiSnare(at);
+  if(offbeat&&(barBeat===0||barBeat===2))lofiNoise(at,.035,.0035,"highpass",7200);
+  if(step%32===27)lofiNoise(at,.035,.0025,"bandpass",1250);
+}
+function lofiScheduler(){
+  if(!soundEnabled||!audioCtx){lofiTimer=null;return}
+  const horizon=audioCtx.currentTime+.14,stepTime=(60/68)/2;
+  while(nextLofiTime<horizon){scheduleLofiStep(lofiStepIndex,nextLofiTime);lofiStepIndex++;nextLofiTime+=stepTime}
+  lofiTimer=window.setTimeout(lofiScheduler,35);
+}
+function startLofi(){if(lofiTimer!==null)return;if(audioReady()){nextLofiTime=audioCtx.currentTime+.08;lofiStepIndex=0;lofiScheduler()}}
+function stopLofi(){if(lofiTimer!==null){clearTimeout(lofiTimer);lofiTimer=null}}
+function updateSoundButton(){const b=$("soundToggle");if(!b)return;b.textContent=soundEnabled?"♫ Sound on":"♫ Sound off";b.setAttribute("aria-pressed",soundEnabled?"true":"false")}
+$("soundToggle").onclick=()=>{
+  soundEnabled=!soundEnabled;try{localStorage.setItem("molequest-sound",soundEnabled?"on":"off")}catch(e){}
+  if(soundEnabled){audioReady();if(audioMaster)audioMaster.gain.setTargetAtTime(.78,audioCtx.currentTime,.06);startLofi();playTap()}
+  else{stopLofi();if(audioCtx&&audioMaster)audioMaster.gain.setTargetAtTime(0,audioCtx.currentTime,.06)}
+  updateSoundButton();
+};
+updateSoundButton();
+const ringR=n=>n<2?0:1+.32*n;
+let G={players:[],cur:0,target:20,phase:"setup",hist:[],msg:""};
+const STANDALONE=true;
+let standaloneBoard=[],standaloneNext=1,boardCards=[],boardLegal=true;
+let atoms=[],mol=null,molOptions=[],selectedMolName="",slot=[],bondT=0,lpStart=0,lpEnd=0,curScale=50,rot=0,boardKey="~",empty=0,simShown=false;
+
+// ---------- canvas ----------
+const cv=$("cv"),ctx=cv.getContext("2d");let W=0,H=0,dpr=1;
+function fit(){dpr=Math.min(devicePixelRatio||1,2);W=cv.clientWidth;H=cv.clientHeight;const w=Math.round(W*dpr),h=Math.round(H*dpr);if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h}}
+function proj(x,y,z,sc){const ca=Math.cos(rot),sa=Math.sin(rot),X=x*ca+z*sa,Z=-x*sa+z*ca,ct=Math.cos(.28),st=Math.sin(.28),Y2=y*ct-Z*st,Z2=y*st+Z*ct,k=14/(14-Z2);return[W/2+X*k*sc,H/2-Y2*k*sc,Z2,k]}
+function ball(x,y,r,col,txt,tc){
+  ctx.fillStyle=col;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+  const g=ctx.createRadialGradient(x-r*.4,y-r*.4,r*.05,x,y,r);
+  g.addColorStop(0,"rgba(255,255,255,.55)");g.addColorStop(.5,"rgba(255,255,255,0)");g.addColorStop(1,"rgba(0,0,0,.35)");
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+  if(txt){ctx.fillStyle=tc;ctx.font="700 "+Math.max(10,r*.85)+"px system-ui,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(txt,x,y+r*.04)}
+}
+const ease=s=>1+2.70158*Math.pow(s-1,3)+1.70158*Math.pow(s-1,2);
+const LPCOL="#ffd84a",ECOL="#8fe3ff";
+// Yellow lone pairs (and blue unpaired electrons of a single atom) that should be visible at time t
+function extras(t){
+  const out=[];
+  if(mol){
+    if(t<lpStart||t>lpEnd+600)return out;
+    const al=t>lpEnd?1-(t-lpEnd)/600:1,s=ease(Math.min(1,(t-lpStart)/450));
+    lpDirs(mol).forEach(x=>{if(slot[x.i]!==undefined)out.push({a:slot[x.i],d:x.d,k:"lp",al,s})});
+  }else if(atoms.length===1){
+    const s=ease(Math.max(0,Math.min(1,(t-atoms[0].born-300)/450)));
+    if(s>.01)freeAtom(atoms[0].el).forEach(x=>out.push({a:0,d:x.d,k:x.k,al:1,s}));
+  }
+  return out;
+}
+function frame(t){
+  requestAnimationFrame(frame);fit();
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);rot+=.006;
+  if(!atoms.length)return;
+  if(mol)geo(mol);
+  const R=mol?mol.R:ringR(atoms.length),m=Math.min(W,H);
+  curScale+=(Math.min(m/7,m*.36/(R+.9))-curScale)*.08;const sc=curScale;
+  const pts=atoms.map(a=>{for(let k=0;k<3;k++)a.p[k]+=(a.t[k]-a.p[k])*.07;return proj(a.p[0],a.p[1],a.p[2],sc)});
+  const items=[];
+  if(mol&&t>bondT){
+    // Each bond is projected from its 3D endpoints and split into depth-sorted tube sections.
+    // This lets one part pass behind an atom while another part stays in front.
+    const al=Math.min(1,(t-bondT)/600),bondColor=getComputedStyle(document.documentElement).getPropertyValue("--bond").trim()||"#9fb0c3",sections=20;
+    mol.bonds.forEach(([i,j,o])=>{
+      const ai=atoms[slot[i]],aj=atoms[slot[j]];if(!ai||!aj)return;
+      const dv=vsub(aj.p,ai.p),len=vlen(dv);if(len<.001)return;const axis=vmul(dv,1/len),side=perp(axis);
+      const p0=vadd(ai.p,vmul(axis,Math.min(EL[ai.el].r*.75,len*.32))),p1=vsub(aj.p,vmul(axis,Math.min(EL[aj.el].r*.75,len*.32)));
+      for(let q=0;q<o;q++){
+        const off=(q-(o-1)/2)*.16,from=vadd(p0,vmul(side,off)),to=vadd(p1,vmul(side,off)),delta=vsub(to,from);
+        for(let k=0;k<sections;k++){
+          const u0=k/sections,u1=(k+1)/sections,A=proj(from[0]+delta[0]*u0,from[1]+delta[1]*u0,from[2]+delta[2]*u0,sc),B=proj(from[0]+delta[0]*u1,from[1]+delta[1]*u1,from[2]+delta[2]*u1,sc);
+          const z=(A[2]+B[2])/2,scale=(A[3]+B[3])/2,dx=B[0]-A[0],dy=B[1]-A[1],segLen=Math.hypot(dx,dy)||1,nx=-dy/segLen,ny=dx/segLen,w=Math.max(2,.052*sc*scale);
+          items.push({z,draw:()=>{
+            ctx.globalAlpha=al;ctx.lineCap="round";ctx.lineWidth=w+2.2;ctx.strokeStyle="rgba(4,11,19,.62)";ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+            const g=ctx.createLinearGradient(A[0],A[1],B[0],B[1]);g.addColorStop(0,"#607589");g.addColorStop(.45,bondColor);g.addColorStop(1,"#657b90");ctx.lineWidth=w;ctx.strokeStyle=g;ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();
+            ctx.globalAlpha=al*.46;ctx.lineWidth=Math.max(.8,w*.16);ctx.strokeStyle="#edf7ff";ctx.beginPath();ctx.moveTo(A[0]+nx*w*.17,A[1]+ny*w*.17);ctx.lineTo(B[0]+nx*w*.17,B[1]+ny*w*.17);ctx.stroke();ctx.globalAlpha=1;
+          }});
+        }
+      }
+    });
+  }
+  atoms.forEach((at,i)=>items.push({z:pts[i][2],draw:()=>{
+    const e=EL[at.el],q=pts[i],s=Math.min(1,(t-at.born)/450),ea=ease(s),r=Math.max(.1,e.r*sc*.75*q[3]*ea);
+    ball(q[0],q[1],r,e.c,at.el,e.t);
+    if(s<1){ctx.globalAlpha=1-s;ctx.strokeStyle="#4fd1a5";ctx.lineWidth=3;ctx.beginPath();ctx.arc(q[0],q[1],r*(1+s*1.1),0,7);ctx.stroke();ctx.globalAlpha=1}
+  }}));
+  extras(t).forEach(x=>{
+    const at=atoms[x.a],dist=lpDist(at.el),q=proj(at.p[0]+x.d[0]*dist,at.p[1]+x.d[1]*dist,at.p[2]+x.d[2]*dist,sc);
+    items.push({z:q[2],draw:()=>{const r=(x.k==="lp"?.18:.09)*sc*q[3]*x.s;if(r<1)return;ctx.globalAlpha=x.al;ball(q[0],q[1],r,x.k==="lp"?LPCOL:ECOL);ctx.globalAlpha=1}});
+  });
+  items.sort((a,b)=>a.z-b.z).forEach(it=>it.draw());
+}
+requestAnimationFrame(frame);
+
+// ---------- board -> atoms ----------
+function sync(list){
+  const want={},have={};list.forEach(e=>want[e]=(want[e]||0)+1);
+  atoms=atoms.filter(a=>{have[a.el]=(have[a.el]||0)+1;return have[a.el]<=(want[a.el]||0)});
+  Object.keys(want).forEach(e=>{const c=atoms.filter(a=>a.el===e).length;
+    for(let k=c;k<want[e];k++)atoms.push({el:e,p:[(Math.random()-.5)*2,5,0],t:[0,0,0],born:performance.now()})});
+  const key=keyOf(list),old=mol;molOptions=MOL.filter(m=>m.key===key);mol=molOptions.find(m=>m.name===selectedMolName)||molOptions[0]||null;selectedMolName=mol?mol.name:"";slot=[];
+  if(mol){
+    const g=geo(mol),used=new Set();
+    mol.atoms.forEach((e,i)=>{const k=atoms.findIndex((a,j)=>a.el===e&&!used.has(j));used.add(k);atoms[k].t=g[i].slice();slot[i]=k});
+    if(mol!==old){bondT=performance.now()+800;lpStart=bondT+700;lpEnd=lpStart+5000}
+  }else{
+    const n=atoms.length,r=ringR(n);
+    atoms.forEach((a,i)=>{const g=i/n*Math.PI*2;a.t=n<2?[0,0,0]:[Math.cos(g)*r,Math.sin(g)*r,0]});
+  }
+}
+function showLP(){if(mol){lpStart=performance.now();lpEnd=lpStart+5000}}
+function onBoard(raw){
+  const previousIds=new Set(boardCards.map(c=>c.id)),hadCards=boardCards.length>0;
+  boardCards=raw.slice();
+  const added=boardCards.filter(c=>!previousIds.has(c.id)),list=raw.map(c=>c.element).sort(),sig=raw.map(c=>c.id).sort().join("|");
+  boardLegal=true;
+  empty=list.length?0:empty+1;
+  if(hadCards&&!boardCards.length&&G.phase==="cleanup")playClear();
+  if(sig!==boardKey){
+    boardKey=sig;const oldMol=mol;sync(list);
+    if(added.length){playScan(added.length);added.slice(0,3).forEach((c,i)=>window.setTimeout(()=>playElementPop(c.element,i),70+i*150))}
+    if(mol&&mol!==oldMol){const bondCount=mol.bonds.length,charge=mol.ch;window.setTimeout(()=>playBondBuild(bondCount),650);window.setTimeout(()=>playMoleculeReveal(charge),1180)}
+    else if(added.length&&list.length>1&&!mol)playSoftNo();
+    if(G.phase==="play")G.msg=!list.length?"Place your cards, or skip and take 2 cards from the shared pool.":mol?(mol.ch?"Ion":"Molecule")+" found! Press Claim to score.":"No molecule yet. Add or change cards, or skip your turn.";
+    updateUI();
+  }
+  if(G.phase==="cleanup"&&empty>=3)nextTurn();
+}
+// ---------- game ----------
+function showModal(html){$("mbox").innerHTML=html;$("modal").style.display="flex"}
+function hideModal(){$("modal").style.display="none"}
+function setup(){
+  G={players:[],cur:0,target:20,phase:"setup",hist:[],msg:""};updateUI();
+  showModal('<h2>Mole-Quest</h2><div>Points = number of atoms + π bonds (double bond: +1; triple bond: +2).</div><p>Deal up to 5 physical cards to each player; the rest form a shared pool. Build and claim a molecule, then return its cards to the pool. If you skip, the turn ends immediately and you take 2 cards from the pool. After a claim, clear the reader and the next turn starts automatically. The game does not ask which cards you take or track private hands. Return all cards to the pool before starting a new game.</p><p><label>Players <select id="np"><option>2</option><option>3</option><option>4</option></select></label></p><div id="names"></div><p><label>Target score <input id="tg" type="number" value="20" min="3" style="width:80px"></label></p><button class="btn go" id="go">Start game</button>');
+  const names=()=>{const n=+$("np").value;$("names").innerHTML=Array.from({length:n},(_,i)=>'<input class="nm" placeholder="Player '+(i+1)+'">').join("")};
+  $("np").onchange=names;names();
+  $("go").onclick=()=>{
+    if(soundEnabled){audioReady();startLofi();playStart()}
+    const nm=[...document.querySelectorAll(".nm")].map((x,i)=>x.value.trim()||"Player "+(i+1));
+    G={players:nm.map(name=>({name,score:0})),cur:0,target:Math.max(3,+$("tg").value||20),phase:"play",hist:[],msg:"Build and claim a molecule, or skip and take 2 cards from the shared pool."};
+    empty=0;boardKey="~";standaloneBoard=[];standaloneNext=1;if(!STANDALONE)fetch("/sim?clear=1");hideModal();updateUI();
+  };
+}
+function claim(){
+  if(G.phase!=="play"||!mol||!boardLegal)return;
+  const p=G.players[G.cur];playClaim();
+  p.score+=mol.pts;
+  G.hist.unshift(p.name+" built "+mol.name+" (+"+mol.pts+")");
+  if(p.score>=G.target){playVictory();G.phase="won";updateUI();showModal('<h2>'+p.name+' wins!</h2><div style="font-size:18px;margin:8px 0 14px">'+p.score+' points. Last molecule: '+mol.name+' ('+mol.formula+')</div><button class="btn go" id="again">New game</button>');$("again").onclick=setup;return}
+  G.phase="cleanup";empty=0;G.msg="+"+mol.pts+" points! Return the cards to the shared pool and clear the reader; the next turn starts automatically.";updateUI();
+}
+function skipTurn(){
+  if(G.phase!=="play"||boardCards.length)return;
+  playSkip();const p=G.players[G.cur];
+  G.hist.unshift(p.name+" skipped and took 2 cards");
+  G.cur=(G.cur+1)%G.players.length;G.phase="play";
+  G.msg=p.name+" skipped and takes 2 cards from the shared pool.";updateUI();
+}
+function nextTurn(){
+  playTurnPass();G.cur=(G.cur+1)%G.players.length;G.phase="play";G.msg="Build and claim a molecule, or skip and take 2 cards from the shared pool.";boardKey="~";updateUI();
+}
+function updateUI(){
+  const P=G.players;
+  $("pl").innerHTML=P.map((p,i)=>'<tr class="'+(i===G.cur&&G.phase!=="won"?"on":"")+'"><td>'+p.name+'</td><td>'+p.score+' / '+G.target+'</td></tr>').join("");
+  if(!P.length){$("turn").textContent="";$("msg").textContent="";$("info").innerHTML="";$("btns").innerHTML="";$("hist").innerHTML="";$("banner").textContent="";return}
+  $("turn").textContent=G.phase==="won"?"Game over":P[G.cur].name+"'s turn";
+  $("msg").textContent=G.msg;
+  $("banner").textContent=G.phase==="cleanup"?"Clear the reader; next turn starts automatically":"";
+  const row=r=>'<div class="row"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>';
+  let h="";
+  if(mol){
+    const chooser=molOptions.length>1?'<div class="hint">Several species can use these atoms. Choose one: <select id="molchoice">'+molOptions.map(m=>'<option value="'+m.name+'"'+(m.name===mol.name?' selected':'')+'>'+m.name+(m.ch?' ('+m.formula+')':'')+'</option>').join("")+'</select></div>':'';
+    const s=mol.bonds.filter(b=>b[2]===1).length,d=mol.bonds.filter(b=>b[2]===2).length,t=mol.bonds.filter(b=>b[2]===3).length;
+    const ty=[s&&s+" single",d&&d+" double",t&&t+" triple"].filter(Boolean).join(", ");
+    const n=Math.abs(mol.ch),chTxt=mol.ch?n+(mol.ch>0?"+":"−")+" ("+n+(mol.ch>0?" missing":" extra")+(n>1?" electrons)":" electron)"):"";
+    const rows=[[mol.ch?"Formula mass":"Molecular mass",mol.mass.toFixed(2)+" g/mol"],["Bonds",mol.bonds.length+" ("+ty+")"],["Sigma bonds (σ)",mol.bonds.length],["Pi bonds (π)",mol.pi],["Shape",mol.shape],["Bond angle",mol.angle],["Lone pairs",mol.lpText]];
+    if(mol.ch)rows.push(["Charge",chTxt]);else rows.push(["Boiling point",mol.bp],["Freezing point",mol.fp]);
+    rows.push(["Points",mol.atoms.length+" atoms + "+mol.pi+" π = "+mol.pts]);
+    h=chooser+'<h2>'+(mol.ch?"Ion":"Molecule")+' formed</h2><div id="mname">'+mol.name+'</div><div id="mform">'+mol.formula+'</div>'+rows.map(row).join("")+
+      '<div id="fact">'+mol.fact+'</div>'+(mol.ch?"":'<div class="hint">Boiling and freezing points are at normal pressure (1 atm).</div>')+
+      '<button class="btn" data-lp="1">Show lone pairs (L)</button>';
+  }else if(atoms.length===1){
+    const e=EL[atoms[0].el];
+    h='<h2>Element</h2><div id="mname">'+e.n+'</div><div id="mform">'+atoms[0].el+'</div>'+
+      [["Atomic number",e.z],["Atomic mass",e.m+" u"],["Electron configuration",e.cfg],["Valence electrons",e.ve],["Lone pairs (yellow)",e.lp0||"None"],["Unpaired electrons (blue)",e.un0],["Usually forms",e.val+(e.val>1?" bonds":" bond")]].map(row).join("")+
+      '<div id="fact">Add more cards to build a molecule.</div>';
+  }else if(atoms.length)h='<h2>Molecule</h2><div id="mname">No molecule yet</div>';
+  $("info").innerHTML=h;
+  const can=G.phase==="play";
+  $("btns").innerHTML=G.phase==="cleanup"?'<button class="btn" disabled>Waiting for reader to clear…</button>':'<button class="btn go" data-c="claim"'+(can&&mol&&boardLegal?"":" disabled")+'>'+(mol?"Claim "+mol.name+" (+"+mol.pts+")":"Claim molecule")+'</button><button class="btn" data-c="skip"'+(can&&!boardCards.length?"":" disabled")+'>Skip turn · take 2 cards</button>';
+  $("hist").innerHTML=G.hist.slice(0,5).map(x=>"• "+x).join("<br>");
+}
+$("info").onclick=e=>{if(e.target.closest("[data-lp]")){playLonePair();showLP()}};
+$("info").onchange=e=>{if(e.target.id==="molchoice"){playTap();selectedMolName=e.target.value;boardKey="~"}};
+$("btns").onclick=e=>{const b=e.target.closest("button");if(!b||b.disabled)return;if(b.dataset.c==="claim")claim();else if(b.dataset.c==="skip")skipTurn();else if(b.dataset.c==="next")nextTurn()};
+$("demo").onclick=e=>{const b=e.target.closest("button");if(!b)return;const a=b.dataset.a;
+  if(STANDALONE){
+    if(a==="clear"){playTap();standaloneBoard=[]}
+    else if(a==="undo"){playTap();standaloneBoard.pop()}
+    else standaloneBoard.push({id:"DEMO-SCAN-"+String(standaloneNext++).padStart(5,"0"),element:a});
+    onBoard(standaloneBoard);return;
+  }
+  if(a==="clear"||a==="undo")playTap();fetch(a==="clear"?"/sim?clear=1":a==="undo"?"/sim?undo=1":"/sim?add="+a)};
+document.querySelectorAll("button").forEach(b=>b.addEventListener("mousedown",e=>e.preventDefault()));
+document.addEventListener("keydown",e=>{
+  if($("modal").style.display==="flex")return;
+  if(e.key==="Enter"||e.key===" "){e.preventDefault();claim()}
+  else if(e.key.toLowerCase()==="d"){simShown=!simShown}
+  else if(e.key.toLowerCase()==="l"){showLP()}
+});
+
+// ---------- poll the game program ----------
+async function poll(){
+  if(STANDALONE){
+    $("rd").textContent="Standalone demo · no RFID reader";
+    $("demo").style.display="flex";
+    onBoard(standaloneBoard);
+    setTimeout(poll,300);return;
+  }
+  try{
+    const d=await (await fetch("/board")).json();
+    $("rd").textContent=d.reader?"Reader connected":"Demo mode (no reader): use the demo cards";
+    $("demo").style.display=(!d.reader||simShown)?"flex":"none";
+    onBoard(d.board);
+  }catch(e){$("rd").textContent="Lost connection to the game program"}
+  setTimeout(poll,300);
+}
+setup();poll();
+</script><script>
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(() => {}));
+}
+</script>
+</body></html>
